@@ -2,7 +2,6 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# Загружаем секретный ключ из файла .env
 load_dotenv()
 api_key = os.getenv("API_KEY")
 
