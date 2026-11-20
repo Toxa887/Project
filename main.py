@@ -5,59 +5,67 @@ from dotenv import load_dotenv
 load_dotenv()
 api_key = os.getenv("API_KEY")
 
-base_url = "https://" + "api.poiskkino.dev/v1.5/movie"
-headers = {"X-API-KEY": api_key}
+BASE_URL = "https://" + "api.poiskkino.dev/v1.5/movie"
+HEADERS = {"X-API-KEY": api_key}
 
-print("1 — Поиск фильмов по названию")
-print("2 — Случайный фильм")
-choice = input("Выберите действие (1 или 2): ").strip()
-
-if choice == "1":
-    query = input("Введите название фильма (например, Матрица): ").strip()
-    if not query:
-        print("Вы не ввели название фильма!")
-        exit()
-
-    params = {"query": query, "limit": 5}
+def get_json(url, params=None):
     try:
-        response = requests.get(f"{base_url}/search", params=params, headers=headers, timeout=5)
-        response.raise_for_status()
+        r = requests.get(url, params=params, headers=HEADERS, timeout=5)
+        r.raise_for_status()
+        return r.json()
     except requests.exceptions.RequestException as e:
-        print("Ошибка подключения к серверу:", e)
-        exit()
+        print(f"Не получилось загрузить данные: {e}")
+        return None
 
-    data = response.json()
-    movies = data.get("docs", [])
+while True:
+    print("\n1 — Поиск фильмов   2 — Случайный фильм   0 — Выход")
+    choice = input("> ").strip()
 
-    if len(movies) == 0:
-        print("По вашему запросу ничего не найдено.")
-        exit()
+    if choice == "0":
+        break
 
-    print("\nНайденные фильмы:")
-    print("-" * 40)
-    for i, movie in enumerate(movies, start=1):
-        name = movie.get("name") or movie.get("alternativeName") or "Без названия"
-        year = movie.get("year", "—")
-        kp = (movie.get("rating") or {}).get("kp") or 0
-        print(f"{i}. {name} ({year}) | Рейтинг КП: {kp:.1f}")
+    elif choice == "1":
+        query = input("Введите название фильма (например, Матрица): ").strip()
+        if not query:
+            continue
 
-elif choice == "2":
-    try:
-        response = requests.get(f"{base_url}/random", headers=headers, timeout=5)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print("Ошибка подключения к серверу:", e)
-        exit()
+        page = 1
+        while True:
+            params = {"query": query, "page": page, "limit": 5}
+            data = get_json(f"{BASE_URL}/search", params)
+            if data is None:
+                break
 
-    movie = response.json()
-    name = movie.get("name") or movie.get("alternativeName") or "Без названия"
-    year = movie.get("year", "—")
-    kp = (movie.get("rating") or {}).get("kp") or 0
-    desc = movie.get("shortDescription") or movie.get("description") or "Нет описания"
+            movies = data.get("docs", [])
+            if not movies:
+                print("Ничего не найдено.")
+                break
 
-    print("-" * 40)
-    print(f"Случайный фильм: {name} ({year})")
-    print(f"Рейтинг Кинопоиска: {kp:.1f}")
-    print(f"Описание: {desc}")
-else:
-    print("Неверный выбор! Запустите программу снова и введите 1 или 2.")
+            print(f"\n--- Страница {page} ---")
+            for i, m in enumerate(movies, start=1):
+                name = m.get("name") or m.get("alternativeName") or "Без названия"
+                year = m.get("year", "—")
+                kp = (m.get("rating") or {}).get("kp") or 0
+                print(f"{i}. {name} ({year}) | Рейтинг КП: {kp:.1f}")
+            print("-" * 30)
+
+            if page < data.get("pages", 1):
+                more = input("Показать ещё? (да/нет): ").strip().lower()
+                if more == "да":
+                    page += 1
+                else:
+                    break
+            else:
+                break
+
+    elif choice == "2":
+        movie = get_json(f"{BASE_URL}/random")
+        if movie:
+            name = movie.get("name") or movie.get("alternativeName") or "Без названия"
+            year = movie.get("year", "—")
+            kp = (movie.get("rating") or {}).get("kp") or 0
+            desc = movie.get("shortDescription") or movie.get("description") or "Нет описания"
+            print("-" * 30)
+            print(f"{name} ({year}) | Рейтинг КП: {kp:.1f}")
+            print(f"Описание: {desc}")
+            print("-" * 30)
